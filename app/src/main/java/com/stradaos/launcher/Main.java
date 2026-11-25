@@ -1488,8 +1488,8 @@ public class Main extends Activity {
     private void layoutColumns() {
         if (splitDrive && showMap) {
             // Pantalla horizontal tipo Android Auto: mapa alto a la izquierda, velocidad arriba y música abajo.
-            mapX = 16; mapW = 640;
-            carX = 668; audX = 668; audW = 340;
+            mapX = 16; mapW = 682;
+            carX = 710; audX = 710; audW = 340;
             driveAudioY = 226; driveAudioH = Math.max(190, dockTop - driveAudioY - 12);
             return;
         }
