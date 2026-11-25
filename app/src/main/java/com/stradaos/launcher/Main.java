@@ -118,6 +118,9 @@ public class Main extends Activity {
      * En horizontal mapY = rowY = 64 y mapH = cardH, o sea, todo queda como siempre.
      */
     private boolean vertical;
+    /** Diseño Strada Drive: mapa a la izquierda y velocidad/música apiladas a la derecha. */
+    private boolean splitDrive;
+    private float driveAudioY = 226, driveAudioH = 218;
     private float mapY = 64, mapH = 380, rowY = 64;
     /** Vertical con solo la tarjeta del vehículo: flota sobre una esquina del mapa y los botones del mapa le dejan sitio. */
     private float insL, insR;
@@ -1344,6 +1347,7 @@ public class Main extends Activity {
         String lmode = prefs.getString("layout_mode", "auto");
         vertical = "vertical".equals(lmode) ? canVertical(W, H) : !"horizontal".equals(lmode) && H >= W * 1.05f;
         if (vertical) sideDock = false;   // en vertical la barra va abajo (la lateral le quitaría ancho al mapa)
+        splitDrive = !vertical && !premium && W >= H * 1.35f;
         if (premium) sideDock = false;
         // Vertical bajo (2.22, Jorge Morales: Tesla con barra de clima, ~768×880): menos de 900 de alto en el lienzo de
         // 720 de ancho. La barra de botones normal se vuelve compacta para que el mapa tenga espacio. Las verticales de
@@ -1482,6 +1486,13 @@ public class Main extends Activity {
     }
 
     private void layoutColumns() {
+        if (splitDrive && showMap) {
+            // Pantalla horizontal tipo Android Auto: mapa alto a la izquierda, velocidad arriba y música abajo.
+            mapX = 16; mapW = 640;
+            carX = 668; audX = 668; audW = 340;
+            driveAudioY = 226; driveAudioH = Math.max(190, dockTop - driveAudioY - 12);
+            return;
+        }
         if (!showMap) {
             mapX = 16; mapW = 0;
             if (vertical) {
@@ -1788,6 +1799,32 @@ public class Main extends Activity {
     }
 
     private void buildCarCard() {
+        if (splitDrive) {
+            final FrameLayout compact = card(carX, rowY, 340, 150, CARD);
+            carCard = compact;
+            TextView heading = tv("VELOCIDAD", 12, MUTED, true);
+            placeWrap(compact, heading, 18, 14);
+            LinearLayout value = new LinearLayout(this);
+            value.setGravity(Gravity.CENTER_VERTICAL);
+            speedTv = tv("0", 58, TEXT, true);
+            TextView unitTv = tv(useMph() ? "mph" : "km/h", 15, MUTED, false);
+            unitTv.setPadding((int)(8*s), 0, 0, (int)(8*s));
+            value.addView(speedTv);
+            value.addView(unitTv);
+            place(compact, value, 18, 42, 230, 78);
+            LinearLayout gps = new LinearLayout(this);
+            gps.setGravity(Gravity.CENTER_VERTICAL);
+            gpsDot = new View(this);
+            gpsDot.setBackground(round(MUTED, 5));
+            gps.addView(gpsDot, new LinearLayout.LayoutParams((int)(8*s), (int)(8*s)));
+            gpsTv = tv("GPS", 11, MUTED, false);
+            gpsTv.setPadding((int)(6*s), 0, 0, 0);
+            gps.addView(gpsTv);
+            place(compact, gps, 250, 18, 76, 22);
+            if (!showCar) board.removeView(compact);
+            setGps(false, 0);
+            return;
+        }
         final FrameLayout card = card(carX, rowY, 300, cardH, CARD);
         carCard = card;
         // barra de abajo compacta: la foto crece y la velocidad baja; sin velocidad (carros sin GPS) la foto llena el resto
@@ -3738,6 +3775,45 @@ public class Main extends Activity {
     }
 
     private void buildAudioCard() {
+        if (splitDrive) {
+            final FrameLayout compact = card(audX, driveAudioY, audW, driveAudioH, CARD);
+            TextView label = tv("REPRODUCTOR", 12, MUTED, true);
+            placeWrap(compact, label, 16, 12);
+            sourceTv = tv("", 11, RED, true);
+            sourceTv.setGravity(Gravity.RIGHT);
+            place(compact, sourceTv, 150, 12, audW - 166, 18);
+            playerArt = new PlayerArt(this, s, asset("ic/music_note.png"));
+            place(compact, playerArt, 16, 42, 104, 104);
+            trackTv = tv("Nada sonando", 17, TEXT, true);
+            trackTv.setSingleLine(true);
+            trackTv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            place(compact, trackTv, 134, 48, audW - 150, 25);
+            artistTv = tv("Radio, Bluetooth o USB", 13, MUTED, false);
+            artistTv.setSingleLine(true);
+            artistTv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            place(compact, artistTv, 134, 76, audW - 150, 20);
+            timePosTv = tv("", 12, MUTED, false);
+            place(compact, timePosTv, 134, 99, audW - 150, 18);
+            final View prev = circleIcon("skip_previous", 42, 21, BTN);
+            final View play = circleIcon("play_arrow", 54, 27, RED);
+            final View next = circleIcon("skip_next", 42, 21, BTN);
+            place(compact, prev, 148, 132, 42, 42);
+            place(compact, play, 198, 126, 54, 54);
+            place(compact, next, 260, 132, 42, 42);
+            playIc = (ImageView) ((FrameLayout) play).getChildAt(0);
+            prev.setOnClickListener(mediaClick(KeyEvent.KEYCODE_MEDIA_PREVIOUS));
+            play.setOnClickListener(mediaClick(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
+            next.setOnClickListener(mediaClick(KeyEvent.KEYCODE_MEDIA_NEXT));
+            compact.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) { openMusicApp(); }
+            });
+            compact.setOnLongClickListener(new View.OnLongClickListener() {
+                public boolean onLongClick(View v) { showPlayerDiag(); return true; }
+            });
+            renderTrack();
+            if (!showPlayer) board.removeView(compact);
+            return;
+        }
         final FrameLayout card = card(audX, rowY, audW, cardH, CARD);
         // contenido centrado: la tarjeta es más ancha sin la del vehículo y más alta con la barra compacta
         final float dx = (audW - 248) / 2, dy = (cardH - 380) / 2;
