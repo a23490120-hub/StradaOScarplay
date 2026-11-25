@@ -1347,7 +1347,7 @@ public class Main extends Activity {
         String lmode = prefs.getString("layout_mode", "auto");
         vertical = "vertical".equals(lmode) ? canVertical(W, H) : !"horizontal".equals(lmode) && H >= W * 1.05f;
         if (vertical) sideDock = false;   // en vertical la barra va abajo (la lateral le quitaría ancho al mapa)
-        splitDrive = !vertical && !premium && W >= H * 1.35f;
+        splitDrive = !vertical && !premium && showCar && showPlayer && W >= H * 1.35f;
         if (premium) sideDock = false;
         // Vertical bajo (2.22, Jorge Morales: Tesla con barra de clima, ~768×880): menos de 900 de alto en el lienzo de
         // 720 de ancho. La barra de botones normal se vuelve compacta para que el mapa tenga espacio. Las verticales de
