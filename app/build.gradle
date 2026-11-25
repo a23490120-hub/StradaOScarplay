@@ -2,23 +2,21 @@ plugins {
     id 'com.android.application'
 }
 
-// Firma de release: se toma de variables de entorno (GitHub Actions). Sin ellas, el APK de release
-// queda sin firmar (así lo necesita F-Droid, que firma con su propia clave).
+// Strada Drive UI: aplicación independiente basada en StradaOS.
 def ksPath = System.getenv('STRADAOS_KEYSTORE')
 
 android {
+    // Se conserva el namespace interno para mantener compatibles las clases y recursos heredados.
     namespace 'com.stradaos.launcher'
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.stradaos.launcher'
-        // Android 4.1+: el objetivo del proyecto es revivir pantallas de carro antiguas.
+        applicationId 'com.stradadrive.ui'
         minSdk 16
-        // 28 a propósito: mantiene el comportamiento probado en pantallas viejas y nuevas.
         targetSdk 28
-        versionCode 72
-        versionName '2.35.0'
-        manifestPlaceholders = [appLabel: 'StradaOS']
+        versionCode 73
+        versionName '1.0.0'
+        manifestPlaceholders = [appLabel: 'Strada Drive UI']
     }
 
     signingConfigs {
@@ -28,7 +26,7 @@ android {
                 storePassword System.getenv('STRADAOS_KEYSTORE_PASSWORD')
                 keyAlias System.getenv('STRADAOS_KEY_ALIAS')
                 keyPassword System.getenv('STRADAOS_KEY_PASSWORD')
-                enableV1Signing true   // Android 4.x solo entiende la firma v1
+                enableV1Signing true
                 enableV2Signing true
             }
         }
@@ -39,12 +37,10 @@ android {
             minifyEnabled false
             if (ksPath) signingConfig signingConfigs.release
         }
-        // Versión de prueba: se instala junto a la normal (otro paquete y otro nombre). En GitHub Actions se firma
-        // con la misma llave que la normal para que cada prueba nueva se instale encima de la anterior.
         debug {
             applicationIdSuffix '.debug'
-            versionNameSuffix '-prueba'
-            manifestPlaceholders = [appLabel: 'StradaOS Prueba']
+            versionNameSuffix '-debug'
+            manifestPlaceholders = [appLabel: 'Strada Drive UI Debug']
             if (ksPath) signingConfig signingConfigs.release
         }
     }
@@ -59,7 +55,6 @@ android {
         checkReleaseBuilds false
     }
 
-    // F-Droid: sin el bloque binario de metadatos de dependencias.
     dependenciesInfo {
         includeInApk false
         includeInBundle false
@@ -67,15 +62,12 @@ android {
 
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach {
-            outputFileName = "StradaOS-${variant.versionName}.apk"
+            outputFileName = "StradaDriveUI-${variant.versionName}.apk"
         }
     }
 }
 
-// API oculta de Android 4.0–4.3 (IRemoteControlDisplay) para leer la pista en reproducción.
-// 1) El stub (src/hiddenapi) se compila solo como referencia: NO entra al APK; en el equipo se usa la clase real.
-// 2) RcDisplay (src/legacy), la única clase que la extiende, se compila contra ese stub y se empaqueta en un jar
-//    que sí entra al APK. El resto del código la carga por reflexión y nunca ve la API oculta.
+// Compatibilidad heredada con Android 4.0–4.3 para lectura de metadatos multimedia.
 def androidJar = files({ android.bootClasspath })
 def stubsDir = layout.buildDirectory.dir('intermediates/hiddenapi/stubs')
 def legacyDir = layout.buildDirectory.dir('intermediates/hiddenapi/legacy')
@@ -98,7 +90,6 @@ def compileLegacy = tasks.register('compileLegacyRc', JavaCompile) {
     options.compilerArgs += ['-Xlint:-options']
 }
 def legacyJar = tasks.register('legacyRcJar', Jar) {
-    // solo las clases (antes también entraba previous-compilation-data.bin, el registro de compilación incremental de Gradle)
     from(compileLegacy.flatMap { it.destinationDirectory }) { exclude 'com/stradaos/launcher/RcCallback*' }
     archiveFileName = 'stradaos-legacy-rc.jar'
     destinationDirectory = layout.buildDirectory.dir('intermediates/hiddenapi')
